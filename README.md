@@ -7,11 +7,20 @@ notícias, sites, redes sociais e bases de dados abertas. Os dados são entregue
 
 O projeto tem três funções bem definidas:
 
-| # | Função | Comando | Saída |
-|---|--------|---------|-------|
-| 1 | **Captação ativa**: busca por palavras-chave e período em notícias, sites, redes sociais e bases abertas | `python -m buscastartups captar` | `dados/abertos/mencoes.csv` / `.json` |
-| 2 | **Classificação "É startup?"**: inovação, modelo de negócio inovador, escalabilidade, repetibilidade e extrema incerteza; casos duvidosos vão para revisão humana | `python -m buscastartups classificar` | `dados/abertos/startups.csv` / `.json`, `dados/revisao/pendentes.csv` |
-| 3 | **Painel**: nome, responsável, setor, maturidade, modelo de negócio, link da fonte e mapa | `python -m buscastartups dashboard` | `http://127.0.0.1:8000/dashboard/` |
+| # | Função | Saída |
+|---|--------|-------|
+| 1 | **Captação ativa**: busca por palavras-chave e período em notícias, sites, redes sociais e bases abertas | `dados/abertos/mencoes.csv` / `.json` |
+| 2 | **Classificação "É startup?"**: inovação, modelo de negócio inovador, escalabilidade, repetibilidade e extrema incerteza; casos duvidosos vão para revisão humana | `dados/abertos/startups.csv` / `.json`, `dados/revisao/pendentes.csv` |
+| 3 | **Painel**: nome, responsável, setor, maturidade, modelo de negócio, link da fonte e mapa | `http://127.0.0.1:8000/dashboard/` |
+
+E dois modos de uso, que podem funcionar juntos:
+
+- **Automático**: repete a busca sozinho a cada `intervalo_horas`, com os termos do `config.toml`,
+  cobrindo o período desde a última execução até hoje;
+- **Manual**: você informa as palavras-chave, o período e as fontes (no painel ou na linha de
+  comando), e o painel mostra o resultado daquela busca.
+
+Cada busca, manual ou automática, executa captação + classificação, e o resultado vai para a mesma base.
 
 ```
                   1. CAPTAÇÃO                        2. CLASSIFICAÇÃO                         3. PAINEL
@@ -55,18 +64,61 @@ export ANTHROPIC_API_KEY="..."                       # ativa a classificação c
 
 ## Uso
 
-Tudo é configurado em [`config.toml`](config.toml): termos, período, fontes, critérios e limiares.
+Tudo é configurado em [`config.toml`](config.toml): termos, período, fontes, critérios, limiares e agenda.
+
+### Início rápido
+
+```bash
+python -m buscastartups iniciar
+```
+
+Abra `http://127.0.0.1:8000/dashboard/`. O mesmo comando:
+
+- liga a **busca automática** (seção `[automatico]` do `config.toml`). Na primeira execução, ela busca
+  os últimos `janela_inicial_dias` dias e depois se repete a cada `intervalo_horas`;
+- mostra no topo do painel o formulário de **busca manual**: palavras-chave, datas inicial e final,
+  fontes e método de classificação. O andamento aparece ao vivo e, no fim, o painel filtra o
+  resultado daquela busca (o botão "mostrar tudo" volta à base completa).
+
+Para só a busca manual, sem o modo automático:
+
+```bash
+python -m buscastartups iniciar --sem-automatico
+```
+
+O servidor atende apenas a própria máquina (`127.0.0.1`) e só uma busca roda por vez. O histórico
+fica em `dados/estado.json`.
+
+### Busca manual pela linha de comando
+
+```bash
+python -m buscastartups buscar --termos "startup,agtech,aceleradora" --de 2026-01-01 --ate 2026-06-30
+```
+
+`--fontes google_news,gdelt` limita as fontes (por nome ou tipo); `--metodo llm` usa a IA. Sem
+`--termos`/`--de`/`--ate`, valem os do `config.toml`.
+
+### Busca automática sem o painel
+
+Para deixar o processo rodando em segundo plano:
+
+```bash
+python -m buscastartups automatico
+```
+
+Ou, para que o sistema operacional agende uma execução por vez, use `--uma-vez` no **cron**
+(Linux/macOS) ou no **Agendador de Tarefas** (Windows). Exemplo de cron, todo dia às 6h:
+
+```bash
+0 6 * * * cd /caminho/BuscaStartups && .venv/bin/python -m buscastartups automatico --uma-vez
+```
 
 ### 1. Captação ativa
 
-```bash
-python -m buscastartups captar
-```
-
-Palavras-chave, período e fontes também podem ser definidos na hora:
+Os comandos `buscar` e `iniciar` já fazem a captação. Para executar só esta etapa:
 
 ```bash
-python -m buscastartups captar --termos "startup,agtech,aceleradora" --de 2026-01-01 --ate 2026-06-30 --fontes google_news,gdelt
+python -m buscastartups captar --termos "startup,agtech" --de 2026-01-01 --ate 2026-06-30
 ```
 
 Fontes disponíveis (tipo em `[[fontes]]`):
@@ -82,8 +134,9 @@ Fontes disponíveis (tipo em `[[fontes]]`):
 | `reddit` | rede social | sim | sim | endpoints públicos `.json` |
 | `youtube` | rede social | sim | sim | YouTube Data API v3 (chave gratuita) |
 
-Para incluir uma nova plataforma, basta criar uma subclasse de `Fonte` em
-`buscastartups/fontes/` e registrá-la em `TIPOS`.
+Na busca manual, as palavras-chave digitadas valem para todas as fontes, substituindo os termos e as
+hashtags definidos em cada fonte. Para incluir uma nova plataforma, crie uma subclasse de `Fonte` em
+`buscastartups/fontes/` e registre-a em `TIPOS`.
 
 ### 2. Classificação "É startup?"
 
@@ -140,22 +193,21 @@ pode servir de padrão-ouro para medir a precisão dos métodos automáticos.
 
 ### 3. Painel
 
-```bash
-python -m buscastartups dashboard
-```
+Aberto com `python -m buscastartups iniciar`, o painel mostra:
 
-Abra `http://127.0.0.1:8000/dashboard/`. O painel mostra:
-
+- área de **busca manual** e situação da **busca automática** (última e próxima execução, botão
+  "Executar agora", andamento e histórico);
 - indicadores: startups, em revisão, não startups, municípios no mapa e organizações sem localização;
 - **mapa** (OpenStreetMap/Leaflet) com um ponto por município, de tamanho proporcional ao número de
   organizações. O ponto é a sede do município (tabela IBGE), não o endereço da empresa;
 - distribuição por setor, maturidade, modelo de negócio, UF e organizações mais citadas;
 - tabela com **nome, responsável, setor, maturidade, modelo de negócio, município/UF, link da fonte**,
   classificação e pontuação. Clique em uma linha para ver critérios, evidências e todas as fontes;
-- filtros, download do recorte em CSV/JSON e registro de revisões.
+- filtros (classificação, setor, maturidade, UF, termo, período em que foi citada e texto), download do
+  recorte em CSV/JSON e registro de revisões.
 
-O painel é uma página estática: também pode ser aberto com qualquer `startups.json`/`.csv` pelo
-botão "Abrir arquivo".
+Fora do servidor, o arquivo `dashboard/index.html` continua funcionando como visualizador: o botão
+"Abrir arquivo" carrega qualquer `startups.json`/`.csv`, mas a área de busca fica oculta.
 
 ## Dados abertos gerados
 
@@ -169,6 +221,7 @@ dados/
 ├── revisao/
 │   ├── pendentes.csv                 # fila de revisão humana (gerado)
 │   └── revisoes.csv                  # decisões humanas (versionar)
+├── estado.json                       # histórico de buscas e última execução automática
 └── cache/                            # municípios IBGE, consultas CNPJ e respostas da IA
 ```
 
@@ -218,6 +271,8 @@ buscastartups/
 ├── modelo.py             # esquemas Mencao e Startup, período, privacidade
 ├── http.py               # cliente HTTP (robots.txt, limite de taxa, novas tentativas)
 ├── captacao.py           # função 1
+├── servico.py            # buscas manual e automática (agenda, histórico, uma por vez)
+├── servidor.py           # servidor local do painel + API da busca
 ├── fontes/               # uma classe por plataforma
 ├── classificacao/
 │   ├── __init__.py       # função 2: consolidação, enriquecimento, veredito, revisão

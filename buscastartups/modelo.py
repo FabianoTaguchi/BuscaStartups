@@ -121,6 +121,7 @@ class Startup:
     fontes: str = ""
     primeira_mencao: str = ""
     ultima_mencao: str = ""
+    termos: str = ""
     ids_mencoes: str = ""
     id: str = ""
 
@@ -158,6 +159,7 @@ DESCRICAO_STARTUP = {
     "fontes": ("string", "Todos os links de fontes, separados por ' | '."),
     "primeira_mencao": ("datetime", "Data da menção mais antiga."),
     "ultima_mencao": ("datetime", "Data da menção mais recente."),
+    "termos": ("string", "Palavras-chave que levaram às menções, separadas por ' | '."),
     "ids_mencoes": ("string", "Ids das menções de origem, separados por '|'."),
 }
 

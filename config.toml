@@ -10,12 +10,21 @@ pasta_dados = "dados"
 
 # ================================================== 1. CAPTAÇÃO ATIVA ====
 [coleta]
-# Podem ser substituídos na linha de comando: --termos "..." --de AAAA-MM-DD --ate AAAA-MM-DD
+# Termos e período padrão. A busca manual (painel ou "buscar --termos ... --de ... --ate ...")
+# usa outros valores sem alterar estes; a busca automática usa estes termos.
 termos = ["startup", "startups", "aceleradora de startups", "investimento anjo", "venture capital"]
 data_inicio = "2026-01-01"
 data_fim = ""                    # vazio = até hoje
 max_por_fonte = 200              # itens por fonte/termo em cada execução
 intervalo_minimo_s = 1.0         # pausa mínima entre requisições ao mesmo site
+
+# ---- modo automático (python -m buscastartups iniciar | automatico) ----
+[automatico]
+habilitado = true                # repete a busca com os termos acima, sozinho
+intervalo_horas = 24             # de quanto em quanto tempo
+janela_inicial_dias = 30         # na primeira execução, busca os últimos N dias
+sobreposicao_dias = 1            # nas seguintes, volta N dias antes da última execução (não perde nada)
+# metodo = "regras"              # classificação usada no automático (padrão: a de [classificacao])
 
 [privacidade]
 # Sal secreto da pseudonimização de autores de postagens: use a variável BUSCASTARTUPS_SAL.

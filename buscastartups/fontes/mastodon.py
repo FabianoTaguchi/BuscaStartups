@@ -22,14 +22,14 @@ class FonteMastodon(Fonte):
             texto=self.html_para_texto(status.get("content", "")),
             autor_hash=self.autor(conta.get("acct", "")),
             data_publicacao=iso_de_texto(status.get("created_at")),
-            idioma=status.get("language") or "", termo_busca=f"#{hashtag}",
+            idioma=status.get("language") or "", termo_busca=hashtag,
             curtidas=status.get("favourites_count"), comentarios=status.get("replies_count"),
             compartilhamentos=status.get("reblogs_count"),
         )
 
     def coletar(self) -> Iterator[Mencao]:
         instancia = self.config.get("instancia", "mastodon.social")
-        hashtags = self.config.get("hashtags") or [t.replace(" ", "") for t in self.termos]
+        hashtags = self.config.get("hashtags") or [t.replace(" ", "") for t in self.termos]  # "venture capital" -> #venturecapital
         for hashtag in hashtags:
             hashtag = hashtag.lstrip("#")
             url = f"https://{instancia}/api/v1/timelines/tag/{hashtag}"

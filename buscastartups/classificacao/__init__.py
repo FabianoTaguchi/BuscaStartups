@@ -18,6 +18,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from ..captacao import juntar_termos
 from ..cnpj import ConsultaCNPJ, resumo
 from ..config import pasta_dados
 from ..exportar import atualizar_datapackage, escrever_csv, escrever_json
@@ -88,6 +89,7 @@ def consolidar(grupo: list[Candidato], mencoes: dict[str, dict]) -> tuple[Startu
         n_mencoes=len({x.mencao_id for x in grupo}),
         url_fonte=links[0] if links else "", fontes=" | ".join(links),
         primeira_mencao=origem[0].get("data_publicacao", ""), ultima_mencao=origem[-1].get("data_publicacao", ""),
+        termos=juntar_termos(*(m.get("termo_busca", "") for m in origem)),
         ids_mencoes="|".join(dict.fromkeys(x.mencao_id for x in grupo)),
         justificativa=" ".join(dict.fromkeys(x.justificativa for x in grupo if x.justificativa)),
     )

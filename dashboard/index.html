@@ -113,12 +113,46 @@ a { color: var(--series-1); }
 }
 .aviso { background: var(--surface-1); border: 1px dashed var(--axis); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 code { font-size: 12px; }
+.busca { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 20px; }
+.busca form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; align-items: end; }
+.busca label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-secondary); }
+.busca .campo-largo { grid-column: 1 / -1; }
+.busca input[type=text], .busca input[type=date] {
+  font: inherit; color: var(--text-primary); background: var(--page); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; min-height: 34px; width: 100%;
+}
+.busca select { width: 100%; }
+.busca fieldset { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin: 0; }
+.busca legend { font-size: 12px; color: var(--text-secondary); padding: 0 4px; }
+#b-fontes { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+#b-fontes label { flex-direction: row; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); }
+.busca .rodape-form { grid-column: 1 / -1; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+button.primario { background: var(--series-1); border-color: var(--series-1); color: #ffffff; font-weight: 600; }
+button.primario:hover { filter: brightness(1.08); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+.estado { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.estado i { width: 10px; height: 10px; border-radius: 50%; background: var(--neutral); flex: none; }
+.estado.executando i { background: var(--series-1); animation: pulsar 1.2s ease-in-out infinite; }
+.estado.concluida i { background: var(--good); }
+.estado.erro i { background: #d03b3b; }
+@keyframes pulsar { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .estado.executando i { animation: none; } }
+#b-log { background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin: 8px 0 0;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-height: 160px; overflow: auto; white-space: pre-wrap; }
+#b-historico { margin: 6px 0 0; padding-left: 18px; font-size: 12px; color: var(--text-secondary); }
+.chip { display: inline-flex; align-items: center; gap: 8px; background: var(--series-1-wash); border-radius: 999px;
+  padding: 4px 6px 4px 12px; font-size: 12px; margin-top: 12px; }
+.chip button { min-height: 24px; padding: 0 8px; font-size: 12px; border-radius: 999px; }
+.filtros input[type=date] { font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; min-height: 34px; }
 .leaflet-popup-content { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
 @media (max-width: 900px) {
   .grade { grid-template-columns: 1fr; }
   .dupla { grid-column: auto; grid-row: auto; }
   .detalhe-grade { grid-template-columns: 1fr; }
   .acoes { margin-left: 0; }
+  .busca { grid-template-columns: 1fr; }
+  .busca form { grid-template-columns: 1fr 1fr; }
 }
 </style>
 </head>
@@ -128,6 +162,37 @@ code { font-size: 12px; }
     <h1>Painel BuscaStartups</h1>
     <p class="sub" id="origem">Carregando dados…</p>
   </header>
+
+  <section class="busca" id="busca" hidden aria-label="Buscas">
+    <div class="card">
+      <h2>Busca manual</h2>
+      <form id="form-busca">
+        <label class="campo-largo">Palavras-chave (separadas por vírgula)
+          <input type="text" id="b-termos" required placeholder="startup, agtech, aceleradora">
+        </label>
+        <label>De <input type="date" id="b-de"></label>
+        <label>Até <input type="date" id="b-ate"></label>
+        <label>Classificação
+          <select id="b-metodo"><option value="regras">Regras</option><option value="llm">IA (Claude)</option></select>
+        </label>
+        <fieldset><legend>Fontes</legend><div id="b-fontes"></div></fieldset>
+        <div class="rodape-form">
+          <button type="submit" class="primario" id="b-enviar">Buscar</button>
+          <span class="mini" id="b-msg" role="alert"></span>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Busca automática</h2>
+      <p class="mini" id="a-info"></p>
+      <button type="button" id="a-executar">Executar agora</button>
+      <h2 style="margin-top:16px">Andamento</h2>
+      <p class="estado" id="b-estado" role="status" aria-live="polite"><i></i><span>Nenhuma busca em andamento.</span></p>
+      <pre id="b-log" hidden></pre>
+      <details><summary class="mini">Histórico de buscas</summary><ul id="b-historico"></ul></details>
+    </div>
+  </section>
+  <div id="chip-busca"></div>
 
   <div class="filtros" role="group" aria-label="Filtros">
     <label>Classificação
@@ -141,7 +206,10 @@ code { font-size: 12px; }
     <label>Setor <select id="f-setor"><option value="">Todos</option></select></label>
     <label>Maturidade <select id="f-maturidade"><option value="">Todas</option></select></label>
     <label>UF <select id="f-uf"><option value="">Todas</option></select></label>
-    <label>Busca <input type="search" id="f-busca" placeholder="nome, responsável, cidade…"></label>
+    <label>Termo <select id="f-termo"><option value="">Todos</option></select></label>
+    <label>Citada de <input type="date" id="f-de"></label>
+    <label>até <input type="date" id="f-ate"></label>
+    <label>Texto <input type="search" id="f-busca" placeholder="nome, responsável, cidade…"></label>
     <div class="acoes">
       <label class="arquivo">Abrir arquivo<input type="file" id="arquivo" accept=".json,.csv"></label>
       <button id="baixar-csv" type="button">Baixar CSV</button>
@@ -151,9 +219,9 @@ code { font-size: 12px; }
   </div>
 
   <div id="aviso" class="aviso" hidden>
-    Nenhum dado encontrado. Rode <code>python -m buscastartups captar</code>, depois
-    <code>python -m buscastartups classificar</code> e abra o painel com
-    <code>python -m buscastartups dashboard</code>, ou use “Abrir arquivo” com um <code>startups.json</code>/<code>startups.csv</code>.
+    Nenhuma organização na base ainda. Faça uma busca manual acima ou aguarde a busca automática.
+    Se o painel foi aberto sem o servidor, rode <code>python -m buscastartups iniciar</code>
+    ou use “Abrir arquivo” com um <code>startups.json</code>/<code>startups.csv</code>.
   </div>
 
   <section class="tiles" aria-label="Resumo">
@@ -186,7 +254,7 @@ code { font-size: 12px; }
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-const ARQUIVOS = ["../dados/abertos/startups.json"];
+const ARQUIVOS = ["/api/startups", "../dados/abertos/startups.json"];  // servidor local; ou arquivo estático
 const VEREDITOS = {startup: "Startup", revisao_humana: "Revisão humana", nao_startup: "Não startup"};
 const MATURIDADES = ["ideacao", "validacao", "operacao", "escala", "desconhecida"];
 const ROT_MATURIDADE = {ideacao: "Ideação", validacao: "Validação", operacao: "Operação", escala: "Escala", desconhecida: "Não informada"};
@@ -258,6 +326,7 @@ function carregar(regs, origem) {
   $("aviso").hidden = todos.length > 0;
   preencher("f-setor", todos.map(r => r.setor));
   preencher("f-uf", todos.map(r => r.uf));
+  preencher("f-termo", todos.flatMap(termosDe));
   preencher("f-maturidade", MATURIDADES.filter(m => todos.some(r => r.maturidade === m)), m => ROT_MATURIDADE[m], false);
   salvarDecisoes();
   atualizar();
@@ -272,12 +341,38 @@ function preencher(id, valores, rotulo = v => v, ordenar = true) {
   sel.value = unicos.includes(atual) ? atual : "";
 }
 
+const termosDe = r => (r.termos || "").split(" | ").map(t => t.trim()).filter(Boolean);
+const normal = t => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+// organização citada no intervalo [de, ate]: entre a primeira e a última menção (sem data: mantida)
+function citadaEntre(r, de, ate) {
+  const primeira = (r.primeira_mencao || "").slice(0, 10), ultima = (r.ultima_mencao || "").slice(0, 10);
+  if (!primeira && !ultima) return true;
+  return (!de || ultima >= de) && (!ate || primeira <= ate);
+}
+
+// resultado de uma busca manual: termos (qualquer um) + período da busca
+let filtroBusca = null;
+
 function filtrar(ignorarVeredito = false) {
   const v = $("f-veredito").value, setor = $("f-setor").value, mat = $("f-maturidade").value, uf = $("f-uf").value;
+  const termo = $("f-termo").value, de = $("f-de").value, ate = $("f-ate").value;
   const busca = $("f-busca").value.trim().toLowerCase();
+  const termosBusca = filtroBusca ? filtroBusca.termos.map(normal) : null;
   return todos.filter(r => (ignorarVeredito || !v || r.veredito === v) && (!setor || r.setor === setor)
     && (!mat || r.maturidade === mat) && (!uf || r.uf === uf)
+    && (!termo || termosDe(r).includes(termo)) && citadaEntre(r, de, ate)
+    && (!filtroBusca || (termosDe(r).some(t => termosBusca.includes(normal(t))) && citadaEntre(r, filtroBusca.de, filtroBusca.ate)))
     && (!busca || [r.nome, r.responsavel, r.municipio, r.setor, r.descricao].join(" ").toLowerCase().includes(busca)));
+}
+
+function mostrarChipBusca() {
+  const chip = $("chip-busca");
+  if (!filtroBusca) { chip.innerHTML = ""; return; }
+  const periodo = [filtroBusca.de && `de ${dataBR(filtroBusca.de)}`, filtroBusca.ate && `até ${dataBR(filtroBusca.ate)}`].filter(Boolean).join(" ");
+  chip.innerHTML = `<span class="chip">Mostrando o resultado da busca: <b>${esc(filtroBusca.termos.join(", "))}</b> ${esc(periodo)}
+    <button type="button" id="limpar-busca">mostrar tudo</button></span>`;
+  $("limpar-busca").addEventListener("click", () => { filtroBusca = null; mostrarChipBusca(); atualizar(); });
 }
 
 function contar(regs, fn) {
@@ -411,7 +506,7 @@ $("tabela").addEventListener("change", ev => {
   else delete decisoes[sel.dataset.id];
   salvarDecisoes();
 });
-["f-veredito", "f-setor", "f-maturidade", "f-uf"].forEach(id => $(id).addEventListener("change", atualizar));
+["f-veredito", "f-setor", "f-maturidade", "f-uf", "f-termo", "f-de", "f-ate"].forEach(id => $(id).addEventListener("change", atualizar));
 $("f-busca").addEventListener("input", atualizar);
 $("baixar-csv").addEventListener("click", () => baixar("startups_filtradas.csv", paraCSV(filtrar()), "text/csv"));
 $("baixar-json").addEventListener("click", () => baixar("startups_filtradas.json", JSON.stringify(filtrar(), null, 2), "application/json"));
@@ -429,16 +524,112 @@ $("arquivo").addEventListener("change", async ev => {
   catch (e) { alert("Não foi possível ler o arquivo: " + e.message); }
 });
 
-iniciarMapa();
-(async () => {
+async function recarregarDados() {
   for (const caminho of ARQUIVOS) {
     try {
       const resp = await fetch(caminho, {cache: "no-store"});
-      if (resp.ok) return carregar(await resp.json(), caminho.split("/").pop());
+      if (resp.ok) return carregar(await resp.json(), "startups.json");
     } catch (e) { /* tenta o próximo */ }
   }
   carregar([], "nenhum");
-})();
+}
+
+// ------------------------------------------------ buscas (manual e automática) --
+// Só funciona com o servidor local (python -m buscastartups iniciar); aberto de outra forma,
+// o painel continua mostrando os dados, sem a área de busca.
+
+const hojeISO = () => new Date().toISOString().slice(0, 10);
+const diasAtras = n => new Date(Date.now() - n * 864e5).toISOString().slice(0, 10);
+const dataBR = d => d ? d.slice(0, 10).split("-").reverse().join("/") : "";
+const dataHoraBR = iso => iso ? new Date(iso).toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"}) : "–";
+const TIPOS_BUSCA = {manual: "Manual", automatica: "Automática"};
+let estavaOcupado = false, temporizador = null;
+
+async function api(caminho, corpo) {
+  const opcoes = corpo === undefined ? {cache: "no-store"}
+    : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)};
+  const resp = await fetch(caminho, opcoes);
+  const dados = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error(dados.erro || `Erro ${resp.status}`);
+  return dados;
+}
+
+async function iniciarBusca() {
+  let conf;
+  try { conf = await api("/api/config"); } catch (e) { return; }
+  $("busca").hidden = false;
+  $("b-termos").value = conf.termos.join(", ");
+  $("b-de").value = conf.de || diasAtras(30);
+  $("b-ate").value = conf.ate || hojeISO();
+  $("b-ate").max = $("b-de").max = hojeISO();
+  $("b-metodo").value = conf.metodo || "regras";
+  $("b-fontes").innerHTML = conf.fontes.map(f => `<label><input type="checkbox" value="${esc(f.nome)}" ${f.habilitada ? "checked" : ""}>
+    ${esc(f.nome)} <span class="mini">(${esc(f.tipo)})</span></label>`).join("");
+  await atualizarStatus();
+}
+
+function mostrarStatus(st) {
+  const a = st.automatico;
+  $("a-info").innerHTML = a.ativo
+    ? `Ativa · a cada ${esc(a.intervalo_horas)} h com os termos do <code>config.toml</code>.<br>
+       Última: ${dataHoraBR(a.ultima)} · Próxima: ${a.ultima ? dataHoraBR(a.proxima) : "em instantes"}`
+    : `Desligada. Para ligar, inicie sem <code>--sem-automatico</code> e com <code>habilitado = true</code> em <code>[automatico]</code>.`;
+  const atual = st.atual, estado = $("b-estado");
+  estado.className = "estado " + (atual ? (atual.status === "concluida" && atual.falhas ? "erro" : atual.status) : "");
+  let texto = "Nenhuma busca em andamento.";
+  if (atual && atual.status === "executando") texto = `Busca ${TIPOS_BUSCA[atual.tipo].toLowerCase()} em andamento: ${atual.termos.join(", ")}…`;
+  else if (atual && atual.status === "concluida") texto = `Última busca (${TIPOS_BUSCA[atual.tipo].toLowerCase()}) concluída: ${fmt(atual.mencoes_captadas)} menções captadas, ${fmt(atual.startups)} startups e ${fmt(atual.revisao)} em revisão na base.`
+    + (atual.falhas ? ` Atenção: ${fmt(atual.falhas)} falha(s) de acesso às fontes (veja o registro abaixo).` : "");
+  else if (atual && atual.status === "erro") texto = `A última busca falhou: ${atual.erro}`;
+  estado.querySelector("span").textContent = texto;
+  $("b-log").hidden = !st.log.length;
+  $("b-log").textContent = st.log.join("\n");
+  $("b-log").scrollTop = $("b-log").scrollHeight;
+  $("b-enviar").disabled = $("a-executar").disabled = st.ocupado;
+  $("b-historico").innerHTML = st.historico.map(h => `<li>${dataHoraBR(h.inicio)} · ${TIPOS_BUSCA[h.tipo]} ·
+    ${esc(h.termos.join(", "))} · ${esc([dataBR(h.de), dataBR(h.ate)].filter(Boolean).join(" a ") || "sem período")} ·
+    ${h.status === "concluida" ? `${fmt(h.mencoes_captadas)} menções` : esc(h.status)}</li>`).join("") || "<li>Nenhuma busca ainda.</li>";
+}
+
+async function atualizarStatus() {
+  clearTimeout(temporizador);
+  let st = null;
+  try { st = await api("/api/status"); mostrarStatus(st); } catch (e) { /* servidor parado: tenta de novo depois */ }
+  if (st && estavaOcupado && !st.ocupado) {
+    $("b-msg").textContent = "";
+    await recarregarDados();  // busca terminou: mostra os dados novos
+    if (st.atual && st.atual.tipo === "manual" && st.atual.status === "concluida") {
+      filtroBusca = {termos: st.atual.termos, de: st.atual.de, ate: st.atual.ate};
+      $("f-veredito").value = "";
+      mostrarChipBusca();
+      atualizar();
+    }
+  }
+  estavaOcupado = !!(st && st.ocupado);
+  temporizador = setTimeout(atualizarStatus, estavaOcupado ? 2000 : 30000);
+}
+
+$("form-busca").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const fontes = [...$("b-fontes").querySelectorAll("input:checked")].map(c => c.value);
+  $("b-msg").textContent = "";
+  if (!fontes.length) { $("b-msg").textContent = "Selecione ao menos uma fonte."; return; }
+  try {
+    await api("/api/buscar", {termos: $("b-termos").value.split(","), de: $("b-de").value, ate: $("b-ate").value,
+                              fontes, metodo: $("b-metodo").value});
+    $("b-msg").textContent = "Busca iniciada. Os resultados aparecem aqui ao terminar.";
+    estavaOcupado = true;
+    atualizarStatus();
+  } catch (e) { $("b-msg").textContent = e.message; }
+});
+$("a-executar").addEventListener("click", async () => {
+  try { await api("/api/automatico/executar", {}); estavaOcupado = true; atualizarStatus(); }
+  catch (e) { alert(e.message); }
+});
+
+iniciarMapa();
+recarregarDados();
+iniciarBusca();
 </script>
 </body>
 </html>

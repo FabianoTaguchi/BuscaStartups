@@ -18,10 +18,18 @@ from .modelo import CAMPOS_MENCAO, DESCRICAO_MENCAO, RE_CNPJ, Mencao, Periodo, a
 log = logging.getLogger(__name__)
 
 
-def termo_encontrado(mencao: Mencao, termos: list[str]) -> str | None:
-    """Primeiro termo presente no título/texto (sem acento e sem diferenciar maiúsculas)."""
+SEP_TERMOS = " | "
+
+
+def termos_encontrados(mencao: Mencao, termos: list[str]) -> list[str]:
+    """Termos presentes no título/texto (sem acento e sem diferenciar maiúsculas)."""
     alvo = normalizar(f"{mencao.titulo} {mencao.texto}")
-    return next((t for t in termos if normalizar(t) in alvo), None)
+    return [t for t in termos if normalizar(t) in alvo]
+
+
+def juntar_termos(*valores: str) -> str:
+    termos = [t for v in valores for t in (v or "").split(SEP_TERMOS) if t]
+    return SEP_TERMOS.join(dict.fromkeys(termos))
 
 
 def captar(config: dict, base: Path, termos: list[str] | None = None,
@@ -49,14 +57,16 @@ def captar(config: dict, base: Path, termos: list[str] | None = None,
             log.error("Tipo de fonte desconhecido: %r (disponíveis: %s)", conf.get("tipo"), ", ".join(TIPOS))
             continue
         # termos passados na linha de comando valem para todas as fontes
-        fonte = classe({**conf, "termos": termos} if termos_cli else conf, ctx)
+        if termos_cli:  # termos informados na hora valem para todas as fontes (inclusive hashtags)
+            conf = {**{k: v for k, v in conf.items() if k != "hashtags"}, "termos": termos}
+        fonte = classe(conf, ctx)
         n = 0
         for m in fonte.coletar():
             if fonte.filtra_localmente and fonte.termos:
-                termo = termo_encontrado(m, fonte.termos)
-                if termo is None:
+                achados = termos_encontrados(m, fonte.termos)
+                if not achados:
                     continue
-                m.termo_busca = termo
+                m.termo_busca = SEP_TERMOS.join(achados)
             if not m.cnpj and (achado := RE_CNPJ.search(f"{m.titulo} {m.texto}")):
                 m.cnpj = achado.group()
             if anonimizar:
@@ -79,7 +89,11 @@ def consolidar_mencoes(config: dict, base: Path) -> list[dict]:
     por_id: dict[str, dict] = {}
     for arquivo in sorted((raiz / "brutos").glob("captacao_*.jsonl")):
         for m in ler_jsonl(arquivo):
-            por_id[m["id"]] = m  # captação mais recente prevalece (métricas atualizadas)
+            # a captação mais recente prevalece (métricas atualizadas), mas os termos que
+            # encontraram a menção em buscas diferentes se acumulam
+            anterior = por_id.get(m["id"], {}).get("termo_busca", "")
+            m["termo_busca"] = juntar_termos(anterior, m.get("termo_busca", ""))
+            por_id[m["id"]] = m
     mencoes = sorted(por_id.values(), key=lambda m: m.get("data_publicacao") or "", reverse=True)
     abertos = raiz / "abertos"
     escrever_csv(mencoes, CAMPOS_MENCAO, abertos / "mencoes.csv")
