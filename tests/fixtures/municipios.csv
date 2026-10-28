@@ -1,0 +1,7 @@
+codigo_ibge,nome,latitude,longitude,capital,codigo_uf,siafi_id,ddd,fuso_horario
+5103403,Cuiabá,-15.601,-56.0974,1,51,9067,65,America/Cuiaba
+5107909,Sinop,-11.8604,-55.5091,0,51,8985,66,America/Cuiaba
+5108402,Várzea Grande,-15.6458,-56.1322,0,51,9183,65,America/Cuiaba
+3550308,São Paulo,-23.5329,-46.6395,1,35,7107,11,America/Sao_Paulo
+5002704,Campo Grande,-20.4486,-54.6295,1,50,9051,67,America/Campo_Grande
+3509502,Campinas,-22.9053,-47.0659,0,35,6291,19,America/Sao_Paulo

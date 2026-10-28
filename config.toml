@@ -1,0 +1,115 @@
+# Configuração do BuscaStartups. Cada bloco [[fontes]] é uma fonte de captação.
+
+[projeto]
+nome = "BuscaStartups"
+descricao = "Startups identificadas em conteúdos públicos da internet (notícias, sites, redes sociais e bases abertas)."
+responsavel = "Nome do(a) mestrando(a)"
+contato = "email@instituicao.br"      # vai no User-Agent: os sites sabem quem está captando
+licenca = "CC-BY-4.0"
+pasta_dados = "dados"
+
+# ================================================== 1. CAPTAÇÃO ATIVA ====
+[coleta]
+# Podem ser substituídos na linha de comando: --termos "..." --de AAAA-MM-DD --ate AAAA-MM-DD
+termos = ["startup", "startups", "aceleradora de startups", "investimento anjo", "venture capital"]
+data_inicio = "2026-01-01"
+data_fim = ""                    # vazio = até hoje
+max_por_fonte = 200              # itens por fonte/termo em cada execução
+intervalo_minimo_s = 1.0         # pausa mínima entre requisições ao mesmo site
+
+[privacidade]
+# Sal secreto da pseudonimização de autores de postagens: use a variável BUSCASTARTUPS_SAL.
+anonimizar_texto = true          # troca e-mails, @menções e telefones por marcadores
+
+# ---- notícias ----
+[[fontes]]
+tipo = "google_news"
+nome = "google-noticias"
+complemento = ""                 # restringe a busca, ex.: '"Mato Grosso"' ou 'Cuiabá OR Sinop'
+baixar_texto = false             # true = tenta baixar o corpo da notícia (respeitando robots.txt)
+
+[[fontes]]
+tipo = "gdelt"
+nome = "gdelt"
+filtro = "sourcecountry:brazil sourcelang:portuguese"
+baixar_texto = true              # o GDELT só fornece título/link
+
+# ---- sites (feeds RSS e páginas) ----
+[[fontes]]
+tipo = "rss"
+nome = "sites-inovacao"
+urls = [
+  "https://startupi.com.br/feed/",
+  "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",
+]
+
+[[fontes]]
+tipo = "web"
+nome = "site-exemplo"
+habilitada = false               # ajuste os seletores CSS ao site e habilite
+urls = ["https://www.exemplo.org.br/noticias"]
+[fontes.seletores]
+item = "article"
+titulo = "h2"
+texto = "p"
+data = "time"
+link = "a"
+
+# ---- redes sociais ----
+[[fontes]]
+tipo = "mastodon"
+nome = "mastodon"
+instancia = "mastodon.social"
+hashtags = ["startup", "startups", "startupbrasil", "empreendedorismo"]
+
+[[fontes]]
+tipo = "reddit"
+nome = "reddit"
+subreddits = ["empreendedorismo", "brasil", "startups"]
+
+[[fontes]]
+tipo = "youtube"
+nome = "youtube"
+chave_api_env = "YOUTUBE_API_KEY"   # sem a variável definida, a fonte é ignorada
+termos = ["startup brasileira", "rodada de investimento startup"]
+max = 100
+
+# ---- bases abertas (CSV/JSON, local ou URL) ----
+[[fontes]]
+tipo = "base_aberta"
+nome = "lista-exemplo"
+habilitada = false               # aponte para uma base real (edital, programa, portal de dados abertos)
+caminho = "dados/entrada/startups_edital.csv"
+separador = ";"
+url_referencia = "https://link-da-publicacao-oficial"
+[fontes.colunas]                 # campo padrão = nome da coluna no arquivo
+nome = "Nome da empresa"
+cnpj = "CNPJ"
+municipio = "Município"
+uf = "UF"
+setor = "Área"
+descricao = "Descrição"
+
+# ======================================== 2. CLASSIFICAÇÃO "É STARTUP?" ====
+[classificacao]
+metodo = "regras"                # "regras" (transparente, sem custo) ou "llm" (Claude; requer ANTHROPIC_API_KEY)
+modelo = "claude-opus-5-5"       # usado apenas no método "llm"
+esforco = "medium"               # low | medium | high
+limiar_startup = 3.0             # pontuação (0-5) a partir da qual é startup...
+criterios_obrigatorios = ["inovacao", "incerteza"]   # ...desde que estes critérios não estejam zerados
+limiar_nao_startup = 1.5         # até esta pontuação: não é startup. Entre os dois: revisão humana
+limiar_minimo_mencao = 1.0       # menções sem nome e abaixo disso nem viram candidatas
+consultar_cnpj = true            # enriquece com dados da Receita (BrasilAPI) quando há CNPJ
+idade_maxima_anos = 10           # CNPJ mais antigo que isso anula o critério de incerteza
+nomes_ignorados = []             # nomes capturados por engano, ex.: ["Sebrae", "Fiemt"]
+
+# Os dicionários de indícios têm valores padrão no código (buscastartups/classificacao/regras.py).
+# Para ampliar ou substituir uma lista, declare-a aqui. Exemplo:
+# [classificacao.criterios]
+# inovacao = ["inovacao", "tecnologia", "patente", "inteligencia artificial"]
+# [classificacao.setores]
+# agtech = ["agtech", "agro", "soja", "pecuaria"]
+
+# ============================================== 3. GEORREFERENCIAMENTO ====
+[geo]
+ufs_foco = ["MT"]                # nestas UFs, o nome do município sozinho no texto já localiza

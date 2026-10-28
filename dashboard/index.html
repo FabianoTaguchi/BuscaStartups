@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel BuscaStartups</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6;
+  --series-1-wash: rgba(42,120,214,0.14);
+  --good: #0ca30c;
+  --warning: #fab219;
+  --neutral: #898781;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d;
+    --surface-1: #1a1a19;
+    --text-primary: #f0efec;
+    --text-secondary: #c3c2b7;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-1-wash: rgba(57,135,229,0.20);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d;
+  --surface-1: #1a1a19;
+  --text-primary: #f0efec;
+  --text-secondary: #c3c2b7;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255,255,255,0.10);
+  --series-1: #3987e5;
+  --series-1-wash: rgba(57,135,229,0.20);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--text-primary);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+.sub { color: var(--text-secondary); margin: 4px 0 0; font-weight: 400; }
+.filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; align-items: flex-end; }
+.filtros label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--text-secondary); }
+select, input[type=search], button, .arquivo {
+  font: inherit; color: var(--text-primary); background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; min-height: 34px;
+}
+button, .arquivo { cursor: pointer; }
+button:hover, .arquivo:hover { border-color: var(--axis); }
+.filtros .arquivo { display: inline-flex; flex-direction: row; align-items: center; color: var(--text-primary); font-size: 14px; }
+.arquivo input { display: none; }
+.acoes { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tile, .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.tile .rot { color: var(--text-secondary); font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.tile .val { font-size: 26px; font-weight: 600; margin-top: 4px; }
+.grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.larga { grid-column: 1 / -1; }
+.dupla { grid-column: span 2; grid-row: span 2; display: flex; flex-direction: column; }
+#mapa { flex: 1; min-height: 420px; border-radius: 8px; z-index: 0; }
+#mapa.mapa-off { color: var(--text-muted); padding: 24px 0; min-height: 0; flex: none; }
+.barras { display: grid; grid-template-columns: minmax(70px, max-content) 1fr 3em; gap: 6px 10px; align-items: center; }
+.barras .linha { display: contents; }
+.barras .nome { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.barras .trilho { height: 14px; }
+.barras .barra { display: block; height: 100%; background: var(--series-1); border-radius: 0 4px 4px 0; min-width: 2px; }
+.barras .num { text-align: right; font-variant-numeric: tabular-nums; }
+.barras .linha:hover .nome { color: var(--text-primary); }
+.vazio { color: var(--text-muted); padding: 16px 0; text-align: center; }
+.selo { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: 12px; }
+.selo i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.selo .startup { background: var(--good); }
+.selo .revisao_humana { background: var(--warning); }
+.selo .nao_startup { background: var(--neutral); }
+.tabela-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.item { cursor: pointer; }
+tr.item:hover td { background: var(--series-1-wash); }
+tr.detalhe td { background: var(--page); }
+.detalhe-grade { display: grid; grid-template-columns: minmax(220px, 1fr) 2fr; gap: 16px; }
+.crit { display: grid; grid-template-columns: 170px 1fr 2.5em; gap: 4px 8px; align-items: center; font-size: 12px; }
+.crit .trilho { height: 8px; background: var(--grid); border-radius: 4px; }
+.crit .barra { display: block; height: 100%; background: var(--series-1); border-radius: 4px; }
+.mini { color: var(--text-secondary); font-size: 12px; }
+a { color: var(--series-1); }
+.decisao { margin-top: 4px; }
+.decisao select { min-height: 28px; padding: 2px 6px; font-size: 12px; }
+#tooltip {
+  position: fixed; pointer-events: none; z-index: 1000; display: none;
+  background: var(--surface-1); color: var(--text-primary); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; box-shadow: 0 4px 16px rgba(0,0,0,.15); font-size: 12px; max-width: 280px;
+}
+.aviso { background: var(--surface-1); border: 1px dashed var(--axis); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+code { font-size: 12px; }
+.leaflet-popup-content { font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; }
+@media (max-width: 900px) {
+  .grade { grid-template-columns: 1fr; }
+  .dupla { grid-column: auto; grid-row: auto; }
+  .detalhe-grade { grid-template-columns: 1fr; }
+  .acoes { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Painel BuscaStartups</h1>
+    <p class="sub" id="origem">Carregando dados…</p>
+  </header>
+
+  <div class="filtros" role="group" aria-label="Filtros">
+    <label>Classificação
+      <select id="f-veredito">
+        <option value="">Todas</option>
+        <option value="startup" selected>Startups</option>
+        <option value="revisao_humana">Em revisão humana</option>
+        <option value="nao_startup">Não startups</option>
+      </select>
+    </label>
+    <label>Setor <select id="f-setor"><option value="">Todos</option></select></label>
+    <label>Maturidade <select id="f-maturidade"><option value="">Todas</option></select></label>
+    <label>UF <select id="f-uf"><option value="">Todas</option></select></label>
+    <label>Busca <input type="search" id="f-busca" placeholder="nome, responsável, cidade…"></label>
+    <div class="acoes">
+      <label class="arquivo">Abrir arquivo<input type="file" id="arquivo" accept=".json,.csv"></label>
+      <button id="baixar-csv" type="button">Baixar CSV</button>
+      <button id="baixar-json" type="button">Baixar JSON</button>
+      <button id="baixar-revisoes" type="button" title="Decisões tomadas nesta página, no formato de dados/revisao/revisoes.csv">Baixar revisões (<span id="n-decisoes">0</span>)</button>
+    </div>
+  </div>
+
+  <div id="aviso" class="aviso" hidden>
+    Nenhum dado encontrado. Rode <code>python -m buscastartups captar</code>, depois
+    <code>python -m buscastartups classificar</code> e abra o painel com
+    <code>python -m buscastartups dashboard</code>, ou use “Abrir arquivo” com um <code>startups.json</code>/<code>startups.csv</code>.
+  </div>
+
+  <section class="tiles" aria-label="Resumo">
+    <div class="tile"><div class="rot"><span class="selo"><i class="startup"></i></span>Startups</div><div class="val" id="k-startup">–</div></div>
+    <div class="tile"><div class="rot"><span class="selo"><i class="revisao_humana"></i></span>Em revisão humana</div><div class="val" id="k-revisao">–</div></div>
+    <div class="tile"><div class="rot"><span class="selo"><i class="nao_startup"></i></span>Não startups</div><div class="val" id="k-nao">–</div></div>
+    <div class="tile"><div class="rot">Municípios no mapa</div><div class="val" id="k-municipios">–</div></div>
+    <div class="tile"><div class="rot">Sem localização</div><div class="val" id="k-semgeo">–</div></div>
+  </section>
+
+  <section class="grade">
+    <div class="card dupla"><h2>Georreferenciamento <span class="sub" id="mapa-info"></span></h2><div id="mapa"></div></div>
+    <div class="card"><h2>Por setor</h2><div id="g-setor"></div></div>
+    <div class="card"><h2>Por maturidade</h2><div id="g-maturidade"></div></div>
+    <div class="card"><h2>Por modelo de negócio</h2><div id="g-modelo"></div></div>
+    <div class="card"><h2>Por UF</h2><div id="g-uf"></div></div>
+    <div class="card"><h2>Mais citadas</h2><div id="g-mencoes"></div></div>
+    <div class="card larga">
+      <h2>Organizações <span class="sub" id="t-info"></span></h2>
+      <div class="tabela-wrap"><table>
+        <thead><tr><th>Nome</th><th>Responsável</th><th>Setor</th><th>Maturidade</th><th>Modelo de negócio</th>
+          <th>Município/UF</th><th>Fonte</th><th>Classificação</th><th>Pontos</th></tr></thead>
+        <tbody id="tabela"></tbody>
+      </table></div>
+      <p class="mini">Clique em uma linha para ver critérios, evidências e todas as fontes. Nas linhas em revisão humana, escolha a decisão e use “Baixar revisões”: salve como <code>dados/revisao/revisoes.csv</code> (ou acrescente as linhas a ele) e rode a classificação de novo.</p>
+    </div>
+  </section>
+</main>
+<div id="tooltip" role="tooltip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const ARQUIVOS = ["../dados/abertos/startups.json"];
+const VEREDITOS = {startup: "Startup", revisao_humana: "Revisão humana", nao_startup: "Não startup"};
+const MATURIDADES = ["ideacao", "validacao", "operacao", "escala", "desconhecida"];
+const ROT_MATURIDADE = {ideacao: "Ideação", validacao: "Validação", operacao: "Operação", escala: "Escala", desconhecida: "Não informada"};
+const CRITERIOS = [["inovacao", "Inovação"], ["modelo_inovador", "Modelo de negócio inovador"],
+  ["escalabilidade", "Escalabilidade"], ["repetibilidade", "Repetibilidade"], ["incerteza", "Extrema incerteza"]];
+const CAMPOS_REVISAO = ["id", "veredito", "nome", "responsavel", "setor", "maturidade", "modelo_negocio",
+  "municipio", "uf", "revisor", "data_revisao", "observacao"];
+
+let todos = [], aberto = null, mapa = null, camada = null;
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString("pt-BR");
+const dec = n => String(n).replace(".", ",");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const tooltip = $("tooltip");
+
+// decisões de revisão ficam guardadas neste navegador até serem baixadas
+let decisoes = {};
+try { decisoes = JSON.parse(localStorage.getItem("buscastartups-decisoes") || "{}"); } catch (e) { decisoes = {}; }
+function salvarDecisoes() {
+  try { localStorage.setItem("buscastartups-decisoes", JSON.stringify(decisoes)); } catch (e) { /* armazenamento indisponível */ }
+  $("n-decisoes").textContent = Object.keys(decisoes).length;
+}
+
+function mostrarTooltip(ev, html) {
+  tooltip.innerHTML = html; tooltip.style.display = "block";
+  tooltip.style.left = Math.min(ev.clientX + 12, innerWidth - tooltip.offsetWidth - 8) + "px";
+  tooltip.style.top = (ev.clientY + 12) + "px";
+}
+const esconderTooltip = () => tooltip.style.display = "none";
+
+function lerCSV(texto) {
+  const linhas = []; let campo = "", linha = [], aspas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (aspas) {
+      if (c === '"' && texto[i + 1] === '"') { campo += '"'; i++; }
+      else if (c === '"') aspas = false; else campo += c;
+    } else if (c === '"') aspas = true;
+    else if (c === ",") { linha.push(campo); campo = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && texto[i + 1] === "\n") i++;
+      linha.push(campo); campo = ""; if (linha.some(v => v !== "")) linhas.push(linha); linha = [];
+    } else campo += c;
+  }
+  if (campo || linha.length) { linha.push(campo); linhas.push(linha); }
+  const [cab, ...resto] = linhas;
+  return resto.map(l => Object.fromEntries(cab.map((c, i) => [c.replace(/^﻿/, ""), l[i] ?? ""])));
+}
+
+function paraCSV(regs, campos) {
+  campos = campos || (regs.length ? Object.keys(regs[0]) : []);
+  const q = v => { const s = String(v ?? ""); return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  return [campos.join(","), ...regs.map(r => campos.map(c => q(r[c])).join(","))].join("\n") + "\n";
+}
+
+function baixar(nome, conteudo, tipo) {
+  const url = URL.createObjectURL(new Blob([conteudo], {type: tipo}));
+  Object.assign(document.createElement("a"), {href: url, download: nome}).click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const num = v => v === "" || v == null || isNaN(Number(v)) ? null : Number(v);
+
+function carregar(regs, origem) {
+  todos = regs.map(r => ({...r, latitude: num(r.latitude), longitude: num(r.longitude), pontuacao: num(r.pontuacao) ?? 0,
+    n_mencoes: num(r.n_mencoes) ?? 0, maturidade: r.maturidade || "desconhecida", veredito: r.veredito || "revisao_humana",
+    ...Object.fromEntries(CRITERIOS.map(([c]) => ["crit_" + c, num(r["crit_" + c]) ?? 0]))}));
+  $("origem").textContent = `${fmt(todos.length)} organizações avaliadas · arquivo: ${origem}`;
+  $("aviso").hidden = todos.length > 0;
+  preencher("f-setor", todos.map(r => r.setor));
+  preencher("f-uf", todos.map(r => r.uf));
+  preencher("f-maturidade", MATURIDADES.filter(m => todos.some(r => r.maturidade === m)), m => ROT_MATURIDADE[m], false);
+  salvarDecisoes();
+  atualizar();
+}
+
+function preencher(id, valores, rotulo = v => v, ordenar = true) {
+  const sel = $(id), atual = sel.value;
+  sel.length = 1;
+  const unicos = [...new Set(valores.filter(Boolean))];
+  if (ordenar) unicos.sort((a, b) => a.localeCompare(b, "pt-BR"));
+  unicos.forEach(v => sel.add(new Option(rotulo(v), v)));
+  sel.value = unicos.includes(atual) ? atual : "";
+}
+
+function filtrar(ignorarVeredito = false) {
+  const v = $("f-veredito").value, setor = $("f-setor").value, mat = $("f-maturidade").value, uf = $("f-uf").value;
+  const busca = $("f-busca").value.trim().toLowerCase();
+  return todos.filter(r => (ignorarVeredito || !v || r.veredito === v) && (!setor || r.setor === setor)
+    && (!mat || r.maturidade === mat) && (!uf || r.uf === uf)
+    && (!busca || [r.nome, r.responsavel, r.municipio, r.setor, r.descricao].join(" ").toLowerCase().includes(busca)));
+}
+
+function contar(regs, fn) {
+  const m = new Map();
+  regs.forEach(r => [].concat(fn(r)).filter(Boolean).forEach(k => m.set(k, (m.get(k) || 0) + 1)));
+  return [...m];
+}
+
+function barras(el, pares, {ordenar = true, rotulo = v => v, max = 10, unidade = ""} = {}) {
+  if (!pares.length) { el.innerHTML = '<div class="vazio">Sem dados</div>'; return; }
+  if (ordenar) pares.sort((a, b) => b[1] - a[1]);
+  const total = pares.reduce((s, p) => s + p[1], 0);
+  const topo = pares.slice(0, max);
+  if (pares.length > max && ordenar && !unidade) topo.push(["Outros", pares.slice(max).reduce((s, p) => s + p[1], 0)]);
+  const maior = Math.max(...topo.map(p => p[1]));
+  el.innerHTML = `<div class="barras">${topo.map(([k, n]) => `
+    <div class="linha" data-rot="${esc(rotulo(k))}" data-n="${n}">
+      <span class="nome" title="${esc(rotulo(k))}">${esc(rotulo(k))}</span>
+      <span class="trilho"><span class="barra" style="width:${(n / maior * 100).toFixed(1)}%"></span></span>
+      <span class="num">${fmt(n)}</span></div>`).join("")}</div>`;
+  el.querySelectorAll(".linha").forEach(l => {
+    l.addEventListener("mousemove", ev => mostrarTooltip(ev, `<b>${l.dataset.rot}</b><br>${fmt(+l.dataset.n)} ${unidade ||
+      `organizações (${(l.dataset.n / total * 100).toFixed(0)}%)`}`));
+    l.addEventListener("mouseleave", esconderTooltip);
+  });
+}
+
+const selo = v => `<span class="selo"><i class="${esc(v)}"></i>${esc(VEREDITOS[v] || v)}</span>`;
+
+function iniciarMapa() {
+  if (!window.L) {
+    $("mapa").outerHTML = '<div id="mapa" class="mapa-off">Mapa indisponível sem acesso à internet (biblioteca e mapas de fundo). As coordenadas estão nas colunas latitude/longitude dos arquivos.</div>';
+    return;
+  }
+  mapa = L.map("mapa", {scrollWheelZoom: false}).setView([-14.2, -51.9], 4);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(mapa);
+  camada = L.layerGroup().addTo(mapa);
+}
+
+function atualizarMapa(regs) {
+  const comGeo = regs.filter(r => r.latitude != null && r.longitude != null);
+  const porCidade = new Map();
+  comGeo.forEach(r => {
+    const k = `${r.municipio}/${r.uf}`;
+    if (!porCidade.has(k)) porCidade.set(k, {lat: r.latitude, lon: r.longitude, itens: []});
+    porCidade.get(k).itens.push(r);
+  });
+  $("k-municipios").textContent = fmt(porCidade.size);
+  $("k-semgeo").textContent = fmt(regs.length - comGeo.length);
+  $("mapa-info").textContent = `· ${fmt(comGeo.length)} de ${fmt(regs.length)} localizadas (ponto = sede do município)`;
+  if (!mapa) return;
+  camada.clearLayers();
+  const estilo = getComputedStyle(document.documentElement);
+  const cor = estilo.getPropertyValue("--series-1").trim(), borda = estilo.getPropertyValue("--surface-1").trim();
+  const pontos = [];
+  porCidade.forEach((c, k) => {
+    const n = c.itens.length;
+    L.circleMarker([c.lat, c.lon], {radius: 6 + Math.sqrt(n) * 4, color: borda, weight: 2, fillColor: cor, fillOpacity: 0.85})
+      .bindTooltip(`${esc(k)}: ${n} ${n > 1 ? "organizações" : "organização"}`)
+      .bindPopup(`<b>${esc(k)}</b><br>${c.itens.slice(0, 15).map(r =>
+        `${esc(r.nome || "(sem nome)")} · ${esc(VEREDITOS[r.veredito])}${r.url_fonte ? ` · <a href="${esc(r.url_fonte)}" target="_blank" rel="noopener">fonte</a>` : ""}`
+      ).join("<br>")}${n > 15 ? `<br>… e mais ${n - 15}` : ""}`)
+      .addTo(camada);
+    pontos.push([c.lat, c.lon]);
+  });
+  if (pontos.length === 1) mapa.setView(pontos[0], 8);
+  else if (pontos.length) mapa.fitBounds(pontos, {padding: [30, 30], maxZoom: 9});
+}
+
+function detalhe(r) {
+  const fontes = (r.fontes || r.url_fonte || "").split(" | ").filter(Boolean);
+  return `<tr class="detalhe"><td colspan="9"><div class="detalhe-grade">
+    <div><div class="crit">${CRITERIOS.map(([c, rot]) => `<span>${rot}</span>
+      <span class="trilho"><span class="barra" style="width:${r["crit_" + c] * 100}%"></span></span>
+      <span class="num">${dec(r["crit_" + c])}</span>`).join("")}</div>
+      <p class="mini">Pontuação ${dec(r.pontuacao)}/5 · método: ${esc(r.metodo)} · ${esc(r.n_mencoes)} menção(ões)${r.cnpj ? ` · CNPJ ${esc(r.cnpj)}` : ""}</p></div>
+    <div>${r.descricao ? `<p>${esc(r.descricao)}</p>` : ""}
+      <p class="mini"><b>Justificativa:</b> ${esc(r.justificativa)}</p>
+      ${r.evidencias ? `<p class="mini"><b>Evidências:</b> ${esc(r.evidencias)}</p>` : ""}
+      <p class="mini"><b>Fontes:</b> ${fontes.map((u, i) => `<a href="${esc(u)}" target="_blank" rel="noopener">${i + 1}</a>`).join(" · ") || "–"}</p></div>
+  </div></td></tr>`;
+}
+
+function tabela(regs) {
+  const LIM = 300;
+  $("t-info").textContent = regs.length > LIM ? `· mostrando ${LIM} de ${fmt(regs.length)} (baixe o CSV para ver todas)` : `· ${fmt(regs.length)}`;
+  $("tabela").innerHTML = regs.slice(0, LIM).map(r => {
+    const nFontes = (r.fontes || "").split(" | ").filter(Boolean).length;
+    const decidido = decisoes[r.id]?.veredito;
+    const decisao = r.veredito === "revisao_humana" ? `<div class="decisao"><select data-id="${esc(r.id)}" aria-label="Decisão da revisão de ${esc(r.nome)}">
+        <option value="">decidir…</option>
+        <option value="startup" ${decidido === "startup" ? "selected" : ""}>É startup</option>
+        <option value="nao_startup" ${decidido === "nao_startup" ? "selected" : ""}>Não é startup</option></select></div>` : "";
+    return `<tr class="item" data-id="${esc(r.id)}" aria-expanded="${aberto === r.id}">
+      <td><b>${esc(r.nome || "(sem nome)")}</b></td><td>${esc(r.responsavel) || "–"}</td><td>${esc(r.setor) || "–"}</td>
+      <td>${esc(ROT_MATURIDADE[r.maturidade] || r.maturidade)}</td><td>${esc(r.modelo_negocio) || "–"}</td>
+      <td>${esc([r.municipio, r.uf].filter(Boolean).join("/")) || "–"}</td>
+      <td>${r.url_fonte ? `<a href="${esc(r.url_fonte)}" target="_blank" rel="noopener">abrir</a>${nFontes > 1 ? ` <span class="mini">+${nFontes - 1}</span>` : ""}` : "–"}</td>
+      <td>${selo(r.veredito)}${decisao}</td>
+      <td class="num">${dec(r.pontuacao)}</td></tr>${aberto === r.id ? detalhe(r) : ""}`;
+  }).join("") || `<tr><td colspan="9" class="vazio">Nenhuma organização com esses filtros</td></tr>`;
+}
+
+function atualizar() {
+  const regs = filtrar(), todasClasses = filtrar(true);
+  const n = v => fmt(todasClasses.filter(r => r.veredito === v).length);
+  $("k-startup").textContent = n("startup");
+  $("k-revisao").textContent = n("revisao_humana");
+  $("k-nao").textContent = n("nao_startup");
+  barras($("g-setor"), contar(regs, r => r.setor || "Não informado"));
+  barras($("g-maturidade"), MATURIDADES.map(m => [m, regs.filter(r => r.maturidade === m).length]).filter(p => p[1]),
+    {ordenar: false, rotulo: m => ROT_MATURIDADE[m]});
+  barras($("g-modelo"), contar(regs, r => (r.modelo_negocio || "").split("|").map(s => s.trim())));
+  barras($("g-uf"), contar(regs, r => r.uf || "Sem UF"));
+  barras($("g-mencoes"), regs.filter(r => r.nome).map(r => [r.nome, r.n_mencoes]), {max: 8, unidade: "menções"});
+  atualizarMapa(regs);
+  tabela(regs);
+}
+
+$("tabela").addEventListener("click", ev => {
+  if (ev.target.closest("a, select")) return;
+  const tr = ev.target.closest("tr.item"); if (!tr) return;
+  aberto = aberto === tr.dataset.id ? null : tr.dataset.id;
+  tabela(filtrar());
+});
+$("tabela").addEventListener("change", ev => {
+  const sel = ev.target.closest("select[data-id]"); if (!sel) return;
+  if (sel.value) decisoes[sel.dataset.id] = {veredito: sel.value, data_revisao: new Date().toISOString().slice(0, 10)};
+  else delete decisoes[sel.dataset.id];
+  salvarDecisoes();
+});
+["f-veredito", "f-setor", "f-maturidade", "f-uf"].forEach(id => $(id).addEventListener("change", atualizar));
+$("f-busca").addEventListener("input", atualizar);
+$("baixar-csv").addEventListener("click", () => baixar("startups_filtradas.csv", paraCSV(filtrar()), "text/csv"));
+$("baixar-json").addEventListener("click", () => baixar("startups_filtradas.json", JSON.stringify(filtrar(), null, 2), "application/json"));
+$("baixar-revisoes").addEventListener("click", () => {
+  const ids = Object.keys(decisoes);
+  if (!ids.length) { alert("Nenhuma decisão registrada: escolha uma decisão nas linhas em revisão humana."); return; }
+  const revisor = prompt("Nome de quem revisou (coluna 'revisor'):", "") || "";
+  const linhas = ids.map(id => ({id, ...decisoes[id], revisor, observacao: "Revisado no painel"}));
+  baixar("revisoes.csv", paraCSV(linhas, CAMPOS_REVISAO), "text/csv");
+});
+$("arquivo").addEventListener("change", async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  const texto = await f.text();
+  try { carregar(f.name.endsWith(".csv") ? lerCSV(texto) : JSON.parse(texto), f.name); }
+  catch (e) { alert("Não foi possível ler o arquivo: " + e.message); }
+});
+
+iniciarMapa();
+(async () => {
+  for (const caminho of ARQUIVOS) {
+    try {
+      const resp = await fetch(caminho, {cache: "no-store"});
+      if (resp.ok) return carregar(await resp.json(), caminho.split("/").pop());
+    } catch (e) { /* tenta o próximo */ }
+  }
+  carregar([], "nenhum");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# dados gerados (podem conter informação pessoal - não versionar)
+dados/brutos/
+dados/abertos/
+dados/cache/
+dados/revisao/pendentes.csv
+__pycache__/
+*.pyc
+.venv/
+.env

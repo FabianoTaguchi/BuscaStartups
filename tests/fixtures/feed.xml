@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>Inovação</title>
+<item><guid>n1</guid><link>https://exemplo.br/n1</link><title>Startup cuiabana recebe aporte seed</title>
+<description>&lt;p&gt;A AgroSense, startup cuiabana de agtech, recebeu aporte seed. A plataforma SaaS usa inteligência artificial para monitorar lavouras. Segundo Ana Souza, CEO da empresa, a meta é a expansão para outros estados com receita recorrente. CNPJ 12.345.678/0001-90. Contato: fulano@ex.br&lt;/p&gt;</description>
+<author>Fulano</author><pubDate>Tue, 27 Oct 2026 12:00:00 -0300</pubDate></item>
+<item><guid>n2</guid><link>https://exemplo.br/n2</link><title>Campeonato de futebol</title>
+<description>Sem relação com o tema.</description><pubDate>Tue, 27 Oct 2026 13:00:00 GMT</pubDate></item>
+<item><guid>n3</guid><link>https://exemplo.br/n3</link><title>Educação</title>
+<description>A startup Lumen Edu, de Sinop (MT), usa tecnologia em um protótipo de aplicativo para alunos.</description>
+<pubDate>Mon, 26 Oct 2026 10:00:00 GMT</pubDate></item>
+<item><guid>n4</guid><link>https://exemplo.br/n4</link><title>Startup antiga</title>
+<description>Notícia de 2025 sobre startup.</description><pubDate>Mon, 01 Dec 2025 10:00:00 GMT</pubDate></item>
+</channel></rss>
